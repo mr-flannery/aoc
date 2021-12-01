@@ -8,6 +8,7 @@
   [s]
   (map #(Integer/parseInt %) (str/split s #"\n")))
 
+(def input (to-int-col (slurp input-file)))
 
 (defn num-increases
   [col]
@@ -16,6 +17,15 @@
      (filter (fn [[first second]] (> second first)))
      count))
 
+(defn three-measurement-window-sums
+  [col]
+  (->> col
+       (partition 3 1)
+       (map #(reduce + %))))
+
 (defn -main
   []
-  (println (num-increases (to-int-col (slurp input-file)))))
+  (println "Part 1")
+  (println (num-increases input))
+  (println "Part 2")
+  (println (num-increases (three-measurement-window-sums input))))
