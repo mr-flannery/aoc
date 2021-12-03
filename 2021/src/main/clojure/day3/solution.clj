@@ -23,7 +23,7 @@
 (defn transpose [m]
   (apply mapv vector m))
 ;; is equivalent to (mapv vector ...m)
-;; apply is similar from a use case perspective like the spread operator in JS
+;; apply is similar to the spread operator in JS from a use case perspective
 ;; map (and mapv) can operate on multiple collections at the same time
 ;; assuming f is an fn that takes an arbitrary number of args
 ;; works: (map + [1 2 3] [1 2 3])
@@ -74,10 +74,30 @@
           (= (count candidates) 1) (first candidates)
           :else (recur candidates mask (inc i)))))))
 
+;; this is the refactored version of part2
+;; not necessarily less code, but somewhat simpler none the less
+(defn select-bits-reducer
+  [selector-fn]
+  (fn
+    [{:keys [candidates result]} index]
+    (if (= 1 (count candidates))
+      {:candidates candidates :result result}
+      (let [next-bit (selector-fn (frequencies (nth (transpose candidates) index)))
+            next-result (str result next-bit)
+            next-candidates (filter #(str/starts-with? % next-result) candidates)]
+        {:candidates next-candidates :result next-result}))))
+
+(defn select-bits2
+  [input selector-fn]
+  (first (:candidates (reduce
+                       (select-bits-reducer selector-fn)
+                       {:candidates input :result ""}
+                       (range (count (first input)))))))
+
 (defn part2
   [input]
-  (let [o2-bits (select-bits input select-o2-bit)
-        co2-bits (select-bits input select-co2-bit)]
+  (let [o2-bits (select-bits2 input select-o2-bit)
+        co2-bits (select-bits2 input select-co2-bit)]
     (* (to-int o2-bits) (to-int co2-bits))))
 
 (defn -main
