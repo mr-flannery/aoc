@@ -1,7 +1,8 @@
 (ns day4
   (:require [clojure.pprint :refer [pprint]]
             [clojure.java.io :as io]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [clojure.set :as set]))
 
 (def example-draws [7 4 9 5 11 17 23 2 0 14 21 24 10 16 13 6 15 25 12 22 18 20 8 19 3 26 1])
 
@@ -94,6 +95,22 @@
   [boards draws]
   (reduce play-round {:winner nil :boards boards :winning-draw nil} draws))
 
+(defn play-round-part2
+  [{:keys [winner boards winning-draw]} draw]
+  (if (some? winner)
+    {:winner winner :boards boards :winning-draw winning-draw}
+    (let [next-boards (map #(mark-number draw %) boards)
+          winners (concat (filter has-winning-row? next-boards) (filter has-winning-column? next-boards))]
+      (if (and (= 1 (count next-boards)) (= 1  (count winners))) ;; next-boar
+        {:winner (first next-boards) :boards next-boards :winning-draw draw}
+        {:winner nil :boards (set/difference (set next-boards) (set winners)) :winning-draw nil}))))
+
+(defn play-game-part2
+  [boards draws]
+  (reduce play-round-part2 {:winner nil :boards boards :winning-draw nil} draws))
+
+(play-game-part2 (prepare-boards example-boards) example-draws)
+
 (defn final-score
   [{:keys [winner winning-draw]}]
   (* (->> winner
@@ -107,9 +124,16 @@
   [boards draws]
   (final-score (play-game (prepare-boards boards) draws)))
 
+(defn part2
+  [boards draws]
+  (final-score (play-game-part2 (prepare-boards boards) draws)))
+
+(part2 example-boards example-draws)
+
 (defn -main
   []
-  (print (part1 real-boards real-draws))) ;; 49686
+  (println (part1 real-boards real-draws)) ;; 49686
+  (println (part2 real-boards real-draws))) ;; 26878 
 
 (-main)
 
