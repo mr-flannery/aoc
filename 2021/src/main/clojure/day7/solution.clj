@@ -16,6 +16,12 @@
        (map #(abs (- target-position %)))
        (reduce +)))
 
+(defn distances-to-position-part2
+  [positions target-position]
+  (->> positions
+       (map #(reduce + (range 1 (inc (abs (- target-position %))))))
+       (reduce +)))
+
 (defn positions-for-input
   [input]
   (range 1 (inc (apply max input))))
@@ -29,4 +35,14 @@
        sort
        first))
 
+(defn part2
+  [horizontal-positions]
+  (->> (positions-for-input horizontal-positions)
+       (map #(distances-to-position-part2 horizontal-positions %))
+     ;; (map vector (positions-for-input example-input))
+     ;; (sort-by second)
+       sort
+       first))
+
 (println (part1 real-input)) ;; 328318
+(println (part2 real-input)) ;; 89791146
