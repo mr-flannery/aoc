@@ -68,6 +68,8 @@
      (reduce +)) ;; 570
 
 ;; get all basins
+;; how could this be solved with a queue?
+;; https://github.com/danielmiladinov/joy-of-clojure/blob/master/src/joy-of-clojure/chapter5/how_to_use_persistent_queues.clj
 (defn basins
   [input]
   (->> (for [y (range (count input))
