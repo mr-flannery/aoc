@@ -75,7 +75,7 @@
           paths 0]
      (if (empty? stack)
        paths
-       (let [[node, visited] (peek stack)
+       (let [[node visited] (peek stack)
              neighbors       (get graph node)
              new-small       (filter #(and
                                        (is-small-cavern? %)
@@ -83,7 +83,7 @@
                                      neighbors)
              large           (filter #(is-large-cavern? %) neighbors)
              all-new         (concat new-small large)
-             new-visited     (if (.contains visited node) visited (conj visited node))
+             new-visited     (if (.contains visited node) visited (conj        visited node))
              all-new-s-elems (map (fn [v] [v, new-visited]) all-new)
              new-stack       (into (pop stack) all-new-s-elems)
              new-paths       (if (= node "end") (inc paths) paths)]
@@ -93,22 +93,6 @@
 (dfs-part1 (undirected-graph example-edges))
 ;; part1
 (dfs-part1 (undirected-graph real-edges)) ;; 4241
-
-(defn new-neigh-and-vis
-  [neighbors visited]
-  (loop [queue (filter is-small-cavern? neighbors)
-         result []
-         visited visited]
-    (println queue)
-    (if (empty? queue)
-      result
-      (let [next (first queue)
-            remaining (rest neighbors)]
-        (if (not (.contains visited next))
-          (recur remaining (conj result next) (conj visited next))
-          (if (or (= next "start") (= next "end") (.contains (vals (frequencies visited)) 2))
-            (recur remaining result visited)
-            (recur remaining (conj result next) (conj visited next))))))))
 
 ;; (new-neigh-and-vis ["d" "a" "b" "c" "start"] ["start" "a" "b" "c"])
 
@@ -130,6 +114,14 @@
                   ["A" "end"]])
 
 (undirected-graph ultra-billo)
+
+(def x 5)
+
+x
+
+(defn function [])
+
+(fn [])
 
 (defn dfs-part2
   ([graph]
@@ -155,7 +147,7 @@
                                          ;; ich könnte auch beim bauen das graphen schon Kanten nach start und end rausschmeißen
                                          (filter #(and (not (= "start" %)) (not (= "end" %))))
                                          (filter is-small-cavern?)
-                                         (filter #(.contains visited %))  
+                                         (filter #(.contains visited %))
                                          (map (fn [v] [v, new-visited, true]))))
              new-stack            (into (into (pop stack) all-new-s-elems) extra-states)
              new-paths            (if (= node "end") (inc paths) paths)]
@@ -165,6 +157,6 @@
 (dfs-part2 (undirected-graph billo-example))
 (dfs-part2 (undirected-graph example-edges))
 
-(dfs-part2 (undirected-graph real-edges))
+(dfs-part2 (undirected-graph real-edges)) ;; 122134
 
 ;; go understand this solution https://github.com/fredoverflow/advent/blob/master/2021/aoc21l.clj

@@ -126,12 +126,12 @@
   [input]
   (reduce (fn [m point] (apply set-point m 0 point)) input (flashers input)))
 
-(clojure.pprint/pprint
- (-> example-input
-     inc-all
-     flash-all
-     reset-flashers
-     ))
+;; (clojure.pprint/pprint
+;;  (-> example-input
+;;      inc-all
+;;      flash-all
+;;      reset-flashers
+;;      ))
 
 (defn step
   [{ :keys [grid flash-count]} step]
@@ -143,3 +143,17 @@
  (let [steps (range 100)
        input real-input]
    (reduce step {:grid input :flash-count 0} steps))) ;; 1617
+
+(defn step-and-check
+  [state step-number]
+  (let [{:keys [grid flash-count]} (step state step-number)]
+    (every? zero? (flatten grid))))
+
+;; part2
+(let [input real-input]
+ (loop [step-num 1
+       state {:grid input :flash-count 0}]
+   (let [{:keys [grid flash-count]} (step state step-num)]
+     (if (every? zero? (flatten grid))
+       step-num
+       (recur (inc step-num) {:grid grid :flash-count flash-count})))))
