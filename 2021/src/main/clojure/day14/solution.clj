@@ -89,7 +89,7 @@
 
 ((take 10 (iterate step-w-rules (index-initial-template example-template))))
 
-(let [template   real-template
+(time (let [template   real-template
       step       (partial step real-rules2)
       num-steps  40
       initial    (index-initial-template template)
@@ -100,5 +100,5 @@
                       (filter (fn [[k v]] (char? k))))
       min        (apply min (vals freqs))
       max        (apply max (vals freqs))]
-  (- max min)) ;; 3288891573057
+  (- max min))) ;; 3288891573057
 
