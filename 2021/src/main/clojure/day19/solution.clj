@@ -399,83 +399,6 @@
 (def real-matches (matches real-scanners))
 (def real-matches2 (matches2 real-scanners))
 
-;; (defn insert-beacon
-;;   [all-beacons beacon]
-;;   (if (map? beacon)
-;;     (if-let [candidate (first (filter #(or (.contains % (beacon :b1)) (.contains % (beacon :b2))) all-beacons))]
-;;       (concat (remove candidate all-beacons) (conj candidate (beacon :b1) (beacon :b2)))
-;;       (conj all-beacons #{beacon}))
-;;     (if-let [candidate (first (filter #(.contains % beacon) all-beacons))]
-;;       (concat (remove candidate all-beacons) (conj candidate beacon))
-;;       (conj all-beacons #{beacon}))))
-
-(defn insert-edge
-  [graph edge]
-  (if (contains? graph (edge :s1))
-    (update-in graph [(edge :s1)] #(conj % (edge :s2)))
-    (assoc graph (edge :s1) [(edge :s2)])))
-
-(def overlap-graph (->> real-matches
-                        (reduce insert-edge {})))
-overlap-graph
-
-(defn path
-  [graph from to]
-  (loop [stack [[from [from]]]]
-    (if (empty? stack)
-      nil
-      (let [[next path] (peek stack)]
-        (if (= next to)
-          path
-          (recur (reduce (fn [stack node] (conj stack [node (conj path node)])) (pop stack) (get graph next))))))))
-
-(defn dfs
-  [graph start]
-  (loop [stack [start]
-         visited #{}]
-    (if (empty? stack)
-      visited
-      (let [next (peek stack)]
-        (recur (into (pop stack) (get graph next)) (conj visited next))))))
-
-()
-
-(dfs overlap-graph 0)
-(map #(dfs overlap-graph %) (range 36))
-(def connnected-components
-  (reduce (fn [components comp]
-            (if-let [subset (first (filter #(subset? % comp) components))]
-              (conj (remove (set subset) components) comp)
-              (if (empty? (filter #(superset? % comp) components))
-                (conj components comp)
-                components)))
-          #{}
-          (map #(dfs overlap-graph %) (range 36))))
-
-connnected-components
-
-;; index matches
-(def indexed-matches (->> real-matches
-                          (map (fn [m] [[(m :s1) (m :s2)] m]))
-                          (into {})))
-
-(map first (group-by first (keys indexed-matches)))
-
-(->> connnected-components
-     first
-     (partition 2 1)
-     (map #(into [] %))
-     first
-     (get indexed-matches))
-
-
-;; ich muss echt erstmal alle Punkte nach 0 normalisieren
-;; oder vllt auch nicht!
-(comment (->> real-matches
-     (mapcat #((% :overlaps) :beacons))
-     (reduce insert-beacon #{})
-     count))
-
 (def real-matches3 (matches3 real-scanners))
 
 ;; all points have unique coordinates
@@ -500,6 +423,7 @@ connnected-components
   (println "known "(count known-beacons))
   (println "unique " (count unique-beacons))
   (println "unmatched " (count unmatched-beacons))
+  (println "unique + unmatched " (+ (count unique-beacons) (count unmatched-beacons)))
   (println "all - known " (count (remove known-beacons (mapcat identity real-scanners))))
   (println "all - unique " (count (remove (set unmatched-beacons) (mapcat identity real-scanners))))
   )
@@ -521,3 +445,7 @@ connnected-components
   (println "unmatched " (count unmatched-beacons))
   (println "unique + unmatched " (+ (count unique-beacons) (count unmatched-beacons)))
   )
+
+(->> real-matches3
+     (map (fn [m] [(m :s1) (m :s2)]))
+     sort)
