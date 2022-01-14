@@ -239,7 +239,8 @@
 ;;         :when (some #(>= (count %) 12) (vals (group-by :offset offsets)))]
 ;;     [rot offsets]))
 
-(defn mapped-points
+(comment
+ (defn mapped-points
   [scanner1 scanner2]
   (let [overlaps (overlaps scanner1 scanner2)]
     (if (empty? overlaps)
@@ -250,7 +251,7 @@
                   (sort-by #(count (second %)) >)
                   first
                   second
-                  (map (fn [{b1 :b1 b2 :b2}] [b1 b2])))]))))
+                  (map (fn [{b1 :b1 b2 :b2}] [b1 b2])))])))))
 
 (comment
   (pprint (let [scanner1 (get scanners 0)
