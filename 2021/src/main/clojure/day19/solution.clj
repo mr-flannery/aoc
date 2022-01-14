@@ -322,10 +322,10 @@
                 (fn [[x y z]] [z (- y) x])
                 (fn [[x y z]] [z x y])
                 (fn [[x y z]] [z (- x) (- y)])
+                (fn [[x y z]] [(- z) x (- y)])
+                (fn [[x y z]] [(- z) (- x) y])
                 (fn [[x y z]] [(- z) y x])
-                (fn [[x y z]] [(- z) (- x) (- y)])
-                (fn [[x y z]] [(- z) y (- x)])
-                (fn [[x y z]] [(- z) (- y) x])])
+                (fn [[x y z]] [(- z) (- y) (- x)])])
 
 (defn overlaps
   [scanner1 scanner2]
