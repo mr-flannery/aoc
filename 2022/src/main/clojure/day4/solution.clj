@@ -27,8 +27,7 @@
 (defn part1
   [input]
   (->> input
-       (map interval-contains?)
-       (filter identity)
+       (filter interval-contains?)
        count))
 
 (defn zip
@@ -49,8 +48,7 @@
 (defn part2
   [input]
   (->> input
-       (map interval-overlaps?)
-       (filter identity)
+       (filter interval-overlaps?)
        count))
 
 (defn -main
