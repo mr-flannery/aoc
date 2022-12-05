@@ -15,6 +15,7 @@
 
 (defn parse-crates
   [input]
+  ; TODO: transpose might be a problem
   (into [] (->> (m/transpose (crates-into-seqs input))
                 (map #(filter some? %))
                 (map flatten)
