@@ -13,6 +13,16 @@
               (map (fn [str] (re-seq #"[A-Z]" str)))))
        (drop-last 1)))
 
+;; parsing crates take two
+
+(let [lines (str/split-lines (first (str/split (slurp input-file) #"\n\n")))]
+  (->> lines
+       (transpose)
+       (map #(apply str %))
+       (map #(re-seq #"[A-Z]" %))
+       (filter some?)
+       (map #(apply str %))))
+
 (defn transpose
   [m]
   (apply mapv vector m))
@@ -33,7 +43,7 @@
 (defn parse-crates
   [input]
   ; TODO: transpose might be a problem
-  (into [] (->> (m/transpose (crates-into-seqs input))
+  (into [] (->> (transpose (crates-into-seqs input))
                 (map #(filter some? %))
                 (map flatten)
                 (map #(into [] %)))))
