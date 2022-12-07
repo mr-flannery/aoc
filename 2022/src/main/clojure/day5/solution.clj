@@ -23,6 +23,21 @@
        (filter some?)
        (map #(apply str %))))
 
+;; parsing crates Flori style
+;;.map.((_, index) =>
+;      lines.map ((line) => line [index * 4 + 1]) .filter ((c) => c !== " ")
+;    )            
+
+(let [lines (str/split-lines (first (str/split (slurp input-file) #"\n\n")))
+      columns (count lines)]
+  (->>
+    (for [column (range 0 columns)]
+      (map #(get % (-> column (* 4) (+ 1))) lines))
+    (map drop-last)
+    (map #(apply str %))
+    (map str/trim)))
+
+
 (defn transpose
   [m]
   (apply mapv vector m))
@@ -30,14 +45,14 @@
 (comment
   (transpose [[1 2] [3 4]])
   (mapv vector [1 2])                                       ; creates a vector of every element in the collection
-                                                            ; => [[1] [2]]
+  ; => [[1] [2]]
   (mapv vector [1 3] [2 4])                                 ; map and mapv can operate on multiple vectors at once.
-                                                            ; so it will create a vector from the first, second etc. elements from all the input cols
-                                                            ; => [[1 2] [3 4]]
+  ; so it will create a vector from the first, second etc. elements from all the input cols
+  ; => [[1 2] [3 4]]
   (mapv vector [1 4] [2 5] [3 6 7])                         ; this only works for "well-formed" inputs, though
-                                                            ; => [[1 2 3] [4 5 6]]
-                                                            ; the 7 from the last col is being dropped, since mapv stops once the first collection is exhausted
-                                                            ; a more robust implementation would require some padding, etc
+  ; => [[1 2 3] [4 5 6]]
+  ; the 7 from the last col is being dropped, since mapv stops once the first collection is exhausted
+  ; a more robust implementation would require some padding, etc
   )
 
 (defn parse-crates
