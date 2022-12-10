@@ -41,8 +41,31 @@
        (take cycle)
        (reduce +)))
 
+;part 1
 (let [sample-at [20 60 100 140 180 220]]
   (->> sample-at
        (map #(signal-strength instructions %))
        (reduce +)))
+
+; part 2
+; the crt draws a single pixel each cycle
+; the register value determines the middle position of the three-wid sprite (for the current row?)
+; a pixel is being drawn if the current pixel is part of the three-wide sprite
+
+(defn reg-vals-at-cycle
+  [instructions]
+  (reduce (fn [reg-vals instruction] (concat reg-vals [(+ (last reg-vals) instruction)])) [1] (drop 1 instructions)))
+
+(let [reg-vals (into [] (reg-vals-at-cycle instructions))]
+  (->> (for [cycle (range 0 240)]
+         (let [pixel   (mod cycle 40)
+               reg-val (get reg-vals cycle)
+               sprite  [(dec reg-val) reg-val (inc reg-val)]]
+           (if (.contains sprite pixel)
+             "#"
+             ".")))
+       (partition 40)
+       (mapv #(into [] %))
+       (map #(apply str %))))
+
 
