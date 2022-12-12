@@ -11,7 +11,7 @@
 (defn safe-parse-int
   [s]
   (try
-    (Integer/parseInt s)
+    (Long/parseLong s)
     (catch Exception e
       nil)))
 
@@ -24,36 +24,18 @@
   (let [monkeys (str/split input #"\n\n")]
     (->> (for [monkey monkeys]
            (let [[monkey-x starting-items operation test if-true if-false] (str/split-lines monkey)]
-             {:monkey          (Integer/parseInt (re-find #"\d" monkey-x))
-              :starting-items  (->> (re-seq #"\d+" starting-items) (map #(Integer/parseInt %)))
+             {:monkey          (Long/parseLong (re-find #"\d" monkey-x))
+              :starting-items  (->> (re-seq #"\d+" starting-items) (map #(BigInteger. %)))
               :operation       (let [[_ mfn mop] (re-find #"new = old ([+\*]) (old|\d+)" operation)
                                      f  (if (= mfn "*") * +)
                                      op (safe-parse-int mop)]
                                  (if (nil? op)
                                    (fn [old] (f old old))
                                    (fn [old] (f old op))))
-              :test            (let [op (Integer/parseInt (re-find #"\d+" test))]
+              :test            (let [op (Long/parseLong (re-find #"\d+" test))]
                                  (fn [n] (= (mod n op) 0)))
-              :if-true         (Integer/parseInt (re-find #"\d" if-true))
-              :if-false        (Integer/parseInt (re-find #"\d" if-false))
-              :inspect-counter 0}))
-         (index-by :monkey))))
-
-(defn parse-monkeys2
-  [input]
-  (let [monkeys (str/split input #"\n\n")]
-    (->> (for [monkey monkeys]
-           (let [[monkey-x starting-items operation test if-true if-false] (str/split-lines monkey)]
-             {:monkey          (Integer/parseInt (re-find #"\d" monkey-x))
-              :starting-items  (->> (re-seq #"\d+" starting-items) (map #(Integer/parseInt %)))
-              :operation       (let [[_ mfn mop] (re-find #"new = old ([+\*]) (old|\d+)" operation)
-                                     f  (if (= mfn "*") * +)
-                                     op (safe-parse-int mop)]
-                                 [mfn mop])
-              :test            (let [op (Integer/parseInt (re-find #"\d+" test))]
-                                 op)
-              :if-true         (re-find #"\d" if-true)
-              :if-false        (re-find #"\d" if-false)
+              :if-true         (Long/parseLong (re-find #"\d" if-true))
+              :if-false        (Long/parseLong (re-find #"\d" if-false))
               :inspect-counter 0}))
          (index-by :monkey))))
 
@@ -122,55 +104,143 @@
   (update-in monkeys [idx :inspect-counter] inc))
 
 (defn play-turn-pure
-  [monkeys idx]
+  [monkeys idx relief-fn]
   (let [{:keys [starting-items operation test if-true if-false]} (get monkeys idx)]
     (loop [monkeys monkeys
            [item & items] starting-items]
       (if (nil? item)
         monkeys
-        (let [new-worry-level (-> item operation (#(/ % 3)) java.lang.Math/floor (#(.intValue %)))]
+        (let [sneaky          (println "Attempting calculation on " item " which is of type " (type item))
+              new-worry-level (-> item
+                                  operation
+                                  relief-fn
+                                  ;java.lang.Math/floor
+                                  ((fn [^java.lang.Double d] (.toBigInteger (BigDecimal/valueOf d)))))]
           (println item)
           (if (test new-worry-level)
             (do
-              (println "throwing " new-worry-level " to monkey " if-true)
-              (recur (-> monkeys 
-                         (throw-item item idx if-true) 
-                         (inc-inspection-counter idx)) 
+              ;(println "throwing " new-worry-level " to monkey " if-true)
+              (recur (-> monkeys
+                         (throw-item new-worry-level idx if-true)
+                         (inc-inspection-counter idx))
                      items))
             (do
-              (println "throwing " new-worry-level " to monkey " if-false)
-              (recur (-> monkeys 
-                         (throw-item item idx if-false) 
-                         (inc-inspection-counter idx)) 
+              ;(println "throwing " new-worry-level " to monkey " if-false)
+              (recur (-> monkeys
+                         (throw-item new-worry-level idx if-false)
+                         (inc-inspection-counter idx))
                      items))))))))
 
 (defn play-round-pure
-  [monkeys]
+  [monkeys relief-fn]
   (loop [monkeys monkeys
          [idx & idxs] (keys monkeys)]
     (if (nil? idx)
       monkeys
       (do
         (println idx)
-        (recur (play-turn-pure monkeys idx) idxs)))))
+        (recur (play-turn-pure monkeys idx relief-fn) idxs)))))
 
 (defn play-n-rounds
+  [monkeys n relief-fn]
+  (loop [monkeys monkeys
+         [round & rounds] (range 0 n)]
+    (if (nil? round)
+      monkeys
+      (recur (play-round-pure monkeys relief-fn) rounds))))
+
+; part1 
+(let [monkeys (play-n-rounds monkeys 20 (fn [n] (/ n 3)))]
+  (->> (vals monkeys)
+       (map :inspect-counter)
+       (sort-by -)
+       (take 2)
+       (apply *)))
+
+; part2
+
+(defn is-divisible-by?
+  [a b]
+  (= 0 (mod a b)))
+
+(defn parse-monkeys-part2
+  [input]
+  (let [monkeys (str/split input #"\n\n")]
+    (->> (for [monkey monkeys]
+           (let [[monkey-x starting-items operation test if-true if-false] (str/split-lines monkey)]
+             {:monkey          (Integer/parseInt (re-find #"\d" monkey-x))
+              :starting-items  (->> (re-seq #"\d+" starting-items) (map #(Integer/parseInt %)))
+              :operation       (let [[_ mfn mop] (re-find #"new = old ([+\*]) (old|\d+)" operation)
+                                     f  (if (= mfn "*") * +)
+                                     op (safe-parse-int mop)]
+                                 (if (nil? op)
+                                   (fn [old] (f old old))
+                                   (fn [old] (f old op))))
+              :test            (let [op (Integer/parseInt (re-find #"\d+" test))]
+                                 op)
+              :if-true         (Integer/parseInt (re-find #"\d" if-true))
+              :if-false        (Integer/parseInt (re-find #"\d" if-false))
+              :inspect-counter 0}))
+         (index-by :monkey))))
+
+(def monkeys-part2 (parse-monkeys-part2 input))
+(->> monkeys-part2
+     vals
+     (map :test)
+     (apply max))
+
+(defn play-turn-pure-part2
+  [monkeys idx]
+  (let [{:keys [starting-items operation test if-true if-false]} (get monkeys idx)
+        max-val (->> monkeys vals (map :test) (apply *))]
+    (loop [monkeys monkeys
+           [item & items] starting-items]
+      (if (nil? item)
+        monkeys
+        (let [new-worry-level (-> item
+                                  ;(#(mod % test))
+                                  operation
+                                  (#(mod % max-val))
+                                  ;(#(mod % test)) ; when I apply it here, I may pass the result to 
+                                  ;((fn [^java.lang.Double d] (.toBigInteger (BigDecimal/valueOf d))))
+                                  )]
+          ;(println item new-worry-level)
+          (if (is-divisible-by? new-worry-level test)
+            (do
+              ;(println "throwing " new-worry-level " to monkey " if-true)
+              (recur (-> monkeys
+                         (throw-item new-worry-level idx if-true)
+                         (inc-inspection-counter idx))
+                     items))
+            (do
+              ;(println "throwing " new-worry-level " to monkey " if-false)
+              (recur (-> monkeys
+                         (throw-item new-worry-level idx if-false)
+                         (inc-inspection-counter idx))
+                     items))))))))
+
+(defn play-round-pure-part2
+  [monkeys]
+  (loop [monkeys monkeys
+         [idx & idxs] (keys monkeys)]
+    (if (nil? idx)
+      monkeys
+      (do
+        ;(println idx)
+        (recur (play-turn-pure-part2 monkeys idx) idxs)))))
+
+(defn play-n-rounds-part2
   [monkeys n]
   (loop [monkeys monkeys
          [round & rounds] (range 0 n)]
     (if (nil? round)
       monkeys
-      (recur (play-round-pure monkeys) rounds))))
+      (recur (play-round-pure-part2 monkeys) rounds))))
 
-(let [monkeys (play-n-rounds monkeys 20)]
+(let [monkeys (play-n-rounds-part2 monkeys-part2 10000)]
   (->> (vals monkeys)
        (map :inspect-counter)
        (sort-by -)
        (take 2)
-       (apply *))
-  ;(->> monkeys
-  ;     vals
-  ;     (map :starting-items)
-  ;     (map count)
-  ;     (reduce +))
-  )
+       (apply *)))
+
