@@ -64,21 +64,38 @@
 (dissoc (init-p-queue sample-map [0 0]) [0 0])
 
 ; dijkstra
-(let [m              real-map
-      starting-point (or (find-starting-point m) [0 0])
-      end-point      (find-ending-point m)
-      p-queue        (init-p-queue m starting-point)]
-  (loop [p-queue p-queue
-         visited []]
-    (let [[p cost] (first p-queue)]
-      (if (= p end-point)
-        cost
-        (let [new-higher-neighbors (->> (neighbors m p)
-                                        (filter #(<= (get-in m %) (inc (get-in m p))))
-                                        (filter #(not (.contains visited %))))
-              updated-p-queue      (reduce (fn [p-q n]
-                                             (let [n-cost (get p-q n)]
-                                               (if (< cost n-cost)
-                                                 (assoc p-q n (inc cost))
-                                                 p-q))) p-queue new-higher-neighbors)]
-          (recur (dissoc updated-p-queue p) (conj visited p)))))))
+(defn cost-of-shortest-path
+  [m starting-point]
+  (let [end-point (find-ending-point m)
+        p-queue   (init-p-queue m starting-point)]
+    (loop [p-queue p-queue
+           visited []]
+      (let [[p cost] (first p-queue)]
+        (if (= p end-point)
+          cost
+          (let [new-higher-neighbors (->> (neighbors m p)
+                                          (filter #(<= (get-in m %) (inc (get-in m p))))
+                                          (filter #(not (.contains visited %))))
+                updated-p-queue      (reduce (fn [p-q n]
+                                               (let [n-cost (get p-q n)]
+                                                 (if (< cost n-cost)
+                                                   (assoc p-q n (inc cost))
+                                                   p-q))) p-queue new-higher-neighbors)]
+            (recur (dissoc updated-p-queue p) (conj visited p))))))))
+
+;part1
+;(cost-of-shortest-path real-map (find-starting-point real-map))
+
+(defn possible-start-points
+  [m]
+  (->> (for [l (range 0 (count m))
+             c (range 0 (count (first m)))]
+         [[l c] (get-in m [l c])])
+       (filter #(= 0 (second %)))
+       (map first))
+  )
+
+;part2
+;(time (let [m real-map]
+;        (->> (possible-start-points m)
+;             (pmap (fn [start] [start (cost-of-shortest-path m start)])))))
