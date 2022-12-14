@@ -43,6 +43,7 @@
   [rocks sand field]
   (and (not (.contains rocks field)) (not (.contains sand field))))
 
+; part1
 (let [entry-point [500 0]
       rocks       rocks
       max-depth   (->> rocks (map second) (apply max))
@@ -62,6 +63,35 @@
                                                          :default (do (.add sand [px py])))
                    :default (recur [nx ny])))))
       ))
-  (println (sort sand))
   (println (count sand)))
+
+(defn cannot-move?
+  [rocks sand [px py]]
+  (and
+    (not (is-free? rocks sand [px (inc py)]))
+    (not (is-free? rocks sand [(dec px) (inc py)]))
+    (not (is-free? rocks sand [(inc px) (inc py)]))))
+
+; part2
+(let [entry-point [500 0]
+      rocks       rocks
+      max-depth   (+ 2 (->> rocks (map second) (apply max)))
+      sand        (java.util.HashSet.)]
+  (println max-depth)
+  (loop [i :next]
+    (if (= i :done)
+      nil
+      (recur (loop [[px py] entry-point]
+               (let [[nx ny] [px (inc py)]]
+                 (cond
+                   (and (= [px py] [500 0]) (cannot-move? rocks sand [px py])) (do (.add sand [px py]) :done)
+                   (= ny max-depth) (do (.add sand [px py]) :next)
+                   (not (is-free? rocks sand [nx ny])) (cond
+                                                         (is-free? rocks sand [(dec nx) ny]) (recur [(dec nx) ny])
+                                                         (is-free? rocks sand [(inc nx) ny]) (recur [(inc nx) ny])
+                                                         :default (do (.add sand [px py]) :next))
+                   :default (recur [nx ny])))))
+      ))
+  (println (count sand)))
+
 
