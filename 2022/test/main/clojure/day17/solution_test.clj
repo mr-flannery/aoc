@@ -66,25 +66,25 @@
   (testing "next piece's bottom y is always 4 higher than the top of the pile"
     (is
       (= 
-        (->> (next-piece piece-fns '()) (map second) (apply min))
+        (->> (next-piece horizontal-line '()) (map second) (apply min))
         3))
     (is
       (=
-        (->> (next-piece piece-fns '(#{[0 0] [1 0] [2 0] [3 0]})) (map second) (apply min))
+        (->> (next-piece horizontal-line '(#{[0 0] [1 0] [2 0] [3 0]})) (map second) (apply min))
         4))
     (is
       (=
-        (->> (next-piece piece-fns '(#{[0 0] [1 0] [2 0] [2 1] [2 2]})) (map second) (apply min))
+        (->> (next-piece horizontal-line '(#{[0 0] [1 0] [2 0] [2 1] [2 2]})) (map second) (apply min))
         6))
     (is
       (=
-        (->> (next-piece piece-fns '(#{[0 1] [1 1] [0 2] [2 2]} #{[0 0] [1 0] [2 0] [2 1] [2 2]})) (map second) (apply min))
+        (->> (next-piece horizontal-line '(#{[0 1] [1 1] [0 2] [2 2]} #{[0 0] [1 0] [2 0] [2 1] [2 2]})) (map second) (apply min))
         6))
     (is
       (=
-        (->> (next-piece [plus] '(#{[2 0] [3 0] [4 0] [5 0]})) (map second) (apply min))
+        (->> (next-piece plus '(#{[2 0] [3 0] [4 0] [5 0]})) (map second) (apply min))
         4))
     (is
       (=
-        (->> (next-piece [reverse-l] '(#{[1 2] [2 1] [2 2] [2 3] [3 2]} #{[2 0] [3 0] [4 0] [5 0]})) (map second) (apply min))
+        (->> (next-piece reverse-l '(#{[1 2] [2 1] [2 2] [2 3] [3 2]} #{[2 0] [3 0] [4 0] [5 0]})) (map second) (apply min))
         7))))
