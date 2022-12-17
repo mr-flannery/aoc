@@ -41,8 +41,19 @@
 
 (defn rotate
   [[h & t]]
-  (doall ; concat is lazy, calling rotate too often in the real input causes StackOverflowError 
-    (concat t [h])))
+  ; concat is lazy, calling rotate too often in the real input causes StackOverflowError
+  ; https://stuartsierra.com/2015/04/26/clojure-donts-concat
+  ; the better solution is apparently to use into
+  ;(doall
+  ;  (concat t [h]))
+  (into t [h]))
+
+; this also scales horribly
+; this effectively makes the whole solution O(n^2)
+; idea: take the 10 highest elements, this should safely be enough
+(defn pile->set
+  [pile]
+  (->> pile (reduce union)))
 
 (defn jet-left
   [piece]
@@ -61,12 +72,12 @@
   (if (= jet \<)
     (if (and
           (not= (->> piece (map first) (apply min)) 0)
-          (= 0 (count (intersection (->> pile (reduce union)) (jet-left piece)))))
+          (= 0 (count (intersection (pile->set pile) (jet-left piece)))))
       (jet-left piece)
       piece)
     (if (and
           (not= (->> piece (map first) (apply max)) 6)
-          (= 0 (count (intersection (->> pile (reduce union)) (jet-right piece)))))
+          (= 0 (count (intersection (pile->set pile) (jet-right piece)))))
       (jet-right piece)
       piece)))
 
@@ -76,12 +87,16 @@
        (map (fn [[x y]] [x (dec y)]))
        (into #{})))
 
+; this is probably inefficient
 (defn can-fall?
   [pile piece]
   (and
-    (= 0 (count (intersection (->> pile (reduce union)) (fall piece))))
+    (= 0 (count (intersection (pile->set pile) (fall piece))))
     (not= 0 (->> piece (map second) (apply min)))))
 
+; this probably also causes scaling issues
+; idea: also try take 10 here
+; the max should be in the first ten
 (defn top-of-pile
   [pile]
   (if (not= 0 (count pile))
@@ -89,24 +104,33 @@
     -1))
 
 (defn next-piece
-  [piece-fns pile]
-  ((first piece-fns) (+ 4 (top-of-pile pile))))
+  [piece-fn pile]
+  (piece-fn (+ 4 (top-of-pile pile))))
 
-(->> (loop [pile      '()
-            piece-fns piece-fns
-            jets      input
-            piece     (next-piece piece-fns pile)]
-       (if (= (count pile) 2022)
-         pile
-         (let [jetted-piece (apply-jet (first jets) pile piece)]
-           (if (can-fall? pile jetted-piece)
-             (recur pile piece-fns (rotate jets) (fall jetted-piece))
-             (let [new-pile      (conj pile jetted-piece)
-                   new-piece-fns (rotate piece-fns)
-                   new-piece     (next-piece new-piece-fns new-pile)]
-               (recur new-pile new-piece-fns (rotate jets) new-piece))))))
-     (reduce union)
-     (map second)
-     (apply max)
-     inc ; the task seems to start counting at 1, not at 0
-     )
+; rotate input is way too expensive anyway
+(def sample-inputv (into [] sample-input))
+(def inputv (into [] input))
+
+(time
+  (->> (let [jets sample-inputv]
+         (loop [pile             '()
+                piece-fn-counter 0
+                jet-counter      0
+                piece            (next-piece (get piece-fns piece-fn-counter) pile)]
+           (if (= (count pile)
+                  ;1000000000000
+                  2022
+                  )
+             pile
+             (let [jetted-piece (apply-jet (get jets jet-counter) pile piece)]
+               (if (can-fall? pile jetted-piece)
+                 (recur pile piece-fn-counter (mod (inc jet-counter) (count jets)) (fall jetted-piece))
+                 (let [new-pile             (conj pile jetted-piece)
+                       new-piece-fn-counter (mod (inc piece-fn-counter) 5)
+                       new-piece            (next-piece (get piece-fns new-piece-fn-counter) new-pile)]
+                   (recur new-pile new-piece-fn-counter (mod (inc jet-counter) (count jets)) new-piece)))))))
+       (reduce union)
+       (map second)
+       (apply max)
+       inc ; the task seems to start counting at 1, not at 0
+       ))
