@@ -1,7 +1,6 @@
-{:paths ["src/main/clojure" "src/main/resources" "src/test/clojure"]
- :deps  {org.clojure/clojure {:mvn/version "1.10.1"}
-         org.clojure/data.priority-map {:mvn/version "1.1.0"}
-         net.mikera/core.matrix {:mvn/version "0.62.0"}
-         org.clojure/spec.alpha {:mvn/version "0.3.218"}}
- :aliases
- {:test {:extra-paths ["src/test/clojure"]}}}
+{:paths   ["src/main/clojure" "src/main/resources"]
+ :deps    {org.clojure/clojure           {:mvn/version "1.10.1"}
+           org.clojure/data.priority-map {:mvn/version "1.1.0"}
+           net.mikera/core.matrix        {:mvn/version "0.62.0"}
+           org.clojure/spec.alpha        {:mvn/version "0.3.218"}}
+ :aliases {:test {:extra-paths ["test/main/clojure" "test/main/resources"]}}}
