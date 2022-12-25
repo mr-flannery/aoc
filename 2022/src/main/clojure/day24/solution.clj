@@ -117,13 +117,4 @@
           back       (find-shortest-path (play-n-rounds field there max-l max-c) [(inc max-l) max-c])
           back-again (find-shortest-path (play-n-rounds field (+ there back) max-l max-c) [-1 0])]
       (println "there: " there ", back: " back ", back again: " back-again)
-      (+ there back back-again)))
-
-  (time
-    (let [field sample-field
-          max-l (->> field keys (map first) (apply max))
-          max-c (->> field keys (map second) (apply max))
-          back  (find-shortest-path (play-n-rounds field 18 max-l max-c) [(inc max-l) max-c])]
-      back)))
-
-(print-field (play-n-rounds sample-field 20 3 5) 3 5)
+      (+ there back back-again))))
