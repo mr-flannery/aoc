@@ -96,4 +96,24 @@
     (is
       (=
         (possible-moves (-> field (play-round 34 99) (play-round 34 99) (play-round 34 99)) [-1 0] 34 99)
-        [[0 0] [-1 0]]))))
+        [[0 0] [-1 0]])))
+  (def sample-field-2 (play-n-rounds sample-field 18 3 5))
+  
+  (testing "sample input part2 turn 18"
+    (is
+      (=
+        (possible-moves sample-field-2 [4 5] 3 5)
+        [[4 5]])))
+  (testing "sample input part2 turn 19"
+    (is
+      (=
+        (possible-moves (-> sample-field-2
+                            (play-round 3 5)) [4 5] 3 5)
+        [[4 5]])))
+  (testing "sample input part2 turn 19"
+    (is
+      (=
+        (possible-moves (-> sample-field-2
+                            (play-round 3 5)
+                            (play-round 3 5)) [4 5] 3 5)
+        [[4 5] [3 5]]))))
