@@ -2,5 +2,6 @@
  :deps    {org.clojure/clojure           {:mvn/version "1.10.1"}
            org.clojure/data.priority-map {:mvn/version "1.1.0"}
            net.mikera/core.matrix        {:mvn/version "0.62.0"}
-           org.clojure/spec.alpha        {:mvn/version "0.3.218"}}
+           org.clojure/spec.alpha        {:mvn/version "0.3.218"}
+           nubank/matcher-combinators    {:mvn/version "3.7.2"}}
  :aliases {:test {:extra-paths ["test/main/clojure" "test/main/resources"]}}}
