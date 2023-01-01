@@ -49,214 +49,214 @@
 ;part2 
 ; I guess I could brute force it by taking the union of all neighbors of all cubes
 ; if one of those neighbors is NOT in cubes but all of *its* neighbors are, that's an air pocket
-(defn is-inside-neighbor?
-  [cubes [nx ny nz]]
-  (let [[min-x max-x] (let [xs (->> cubes
-                                    (filter (fn [[x y z]] (= [y z] [ny nz])))
-                                    (map first)
-                                    sort)]
-                        [(or (first xs) 1) (or (last xs) -1)])
-        [min-y max-y] (let [ys (->> cubes
-                                    (filter (fn [[x y z]] (= [x z] [nx nz])))
-                                    (map second)
-                                    sort)]
-                        [(or (first ys) 1) (or (last ys) -1)])
-        [min-z max-z] (let [zs (->> cubes
-                                    (filter (fn [[x y z]] (= [x y] [nx ny])))
-                                    (map last)
-                                    sort)]
-                        [(or (first zs) 1) (or (last zs)) -1])]
-    (and
-      (<= min-x nx max-x)
-      (<= min-y ny max-y)
-      (<= min-z nz max-z))))
-
-(comment
-  (time
-    (let [input       real-cubes
-          all-cubes   (part1 input)
-          air-pockets (->> input
-                           (map neighbors)
-                           (map #(into #{} %))
-                           (reduce union)
-                           (filter #(is-inside-neighbor? input %))
-                           (map (fn [c] [c (neighbors c)]))
-                           (filter (fn [[c n]]
-                                     (and
-                                       (not (.contains input c))
-                                       (->> n
-                                            (filter #(.contains input %))
-                                            count
-                                            (#(>= % 5))))))
-                           (map first)
-                           )
-          ]
-      (- all-cubes (part1 air-pockets))
-      )))
-
-; can I determine enclosing cube?
-; yes I can. What does that help me?
-
-; let's construct a real dumb example
-(def dumb-cubes (remove #{[1 1 1]} (for [x (range 0 3)
-                                         y (range 0 3)
-                                         z (range 0 3)]
-                                     [x y z])))
-
-(def dumb-cubes2 (remove #{[2 0 1] [2 1 1] [1 1 1]} (for [x (range 0 4)
-                                                          y (range 0 3)
-                                                          z (range 0 3)]
-                                                      [x y z])))
-
-; this approach is somewhat flawed and too slow
-;(def is-connected-to-outside?
-;  (memoize
-;    (fn
-;      [graph from perimeter]
-;      (loop [[node & nodes] [from]
-;             visited #{}]
-;        (cond
-;          (nil? node) false
-;          (.contains visited node) (recur nodes visited)
-;          (.contains perimeter node) true
-;          :default (recur (into nodes (get graph node)) (conj visited node)))))))
-
-; can I do a search/expand instead?
-; I start with a node
-; generate it's neighbors
-; filter out the ones that are part of the input set
-; check if its outside
-; if yes, return true
-; if not, recur with neighbors
-
-(defn is-inside-droplet?
-  [cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z]]
-  ;(println [x y z])
-  (if (and
-        (get-in cubes-by-x-y [x y])
-        (get-in cubes-by-x-z [x z])
-        (get-in cubes-by-y-z [y z]))
-    (let [xs (->> (get-in cubes-by-y-z [y z])
-                  (map first)
-                  sort)
-          ys (->> (get-in cubes-by-x-z [x z])
-                  (map second)
-                  sort)
-          zs (->> (get-in cubes-by-x-y [x y])
-                  (map #(get % 2))
-                  sort)]
-      ;(println xs ys zs)
-      (and
-        (<= (first xs) x (last xs)) ; is in the inner cube
-        (<= (first ys) y (last ys))
-        (<= (first zs) z (last zs))))
-    false))
-
-(defn is-connected-to-outside?
-  [cubes-by-x-y cubes-by-x-z cubes-by-y-z cubes node]
-  ;(println node)
-  (loop [[n & ns] [node]
-         visited #{}]
-    (cond
-      (nil? n) false
-      (.contains visited n) (recur ns visited)
-      (not (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z n)) true
-      :default (recur (into ns (->> (neighbors n)
-                                    (filter #(not (.contains cubes %))))) (conj visited n)))))
-
-(defn is-connected-to-outside?2
-  [min-x max-x min-y max-y min-z max-z cubes node]
-  ;(println node)
-  (loop [[n & ns] [node]
-         visited #{}]
-    ;(println n)
-    ;(Thread/sleep 100)
-    (let [[x y z] n]
-      (cond
-        (nil? n) false
-        (.contains visited n) (recur ns visited)
-        (or (< x min-x) (> x max-x)
-            (< y min-y) (> y max-y)
-            (< z min-z) (> z max-z)) true
-        :default (recur (into ns (->> (neighbors n)
-                                      (filter #(not (.contains cubes %))))) (conj visited n))))))
-
-; I'm not sure where my problem lies here, but let's ditch this approach for now
-; wait a second...
-(comment
-  (let [cubes        (into #{} real-cubes)
-        [min-x max-x] (let [xs (->> cubes
-                                    (map first)
-                                    sort)]
-                        [(first xs) (last xs)])
-        [min-y max-y] (let [ys (->> cubes
-                                    (map second)
-                                    sort)]
-                        [(first ys) (last ys)])
-        [min-z max-z] (let [zs (->> cubes
-                                    (map #(get % 2))
-                                    sort)]
-                        [(first zs) (last zs)])
-        cubes-by-x-y (->> cubes
-                          (group-by first)
-                          (map (fn [[x cubes]] [x (group-by second cubes)]))
-                          (into {}))
-        cubes-by-x-z (->> cubes
-                          (group-by first)
-                          (map (fn [[x cubes]] [x (group-by #(get % 2) cubes)]))
-                          (into {}))
-        cubes-by-y-z (->> cubes
-                          (group-by second)
-                          (map (fn [[x cubes]] [x (group-by #(get % 2) cubes)]))
-                          (into {}))
-        air-pockets  (->> (for [x (range min-x (inc max-x))
-                                y (range min-y (inc max-y))
-                                z (range min-z (inc max-z))
-                                ;:when (and
-                                ;        (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z])
-                                ;        (not (.contains cubes [x y z])))
-                                :when (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z])
-                                ]
-                            [x y z]))
-        ;pockets               (->> air-pockets
-        ;                           (filter (fn [[cube category]] (= category :pocket)))
-        ;                           (map first)
-        ;                           )
-        ;perimeter             (->> air-pockets
-        ;                           (filter (fn [[cube category]] (= category :perimeter)))
-        ;                           (map first)
-        ;                           )
-        ;pockets-and-perimeter (concat pockets perimeter)
-        ;pp-graph              (reduce (fn [m cube] (assoc m cube (filter #(are-adjacent? cube %) pockets-and-perimeter))) {} pockets-and-perimeter)
-        ;actual-pockets    (filter #(not (is-connected-to-outside?2 min-x max-x min-y max-y min-z max-z cubes %)) air-pockets)
-        ;actual-pockets    (filter #(is-connected-to-outside?2 min-x max-x min-y max-y min-z max-z cubes %) air-pockets)
-        ;bla               (println (count air-pockets))
-        ;bla               (println (count actual-pockets))
-        ;clustered-pockets (loop [[p & ps] actual-pockets
-        ;                         res []]
-        ;                    (if (nil? p)
-        ;                      res
-        ;                      (let [cluster (conj (->> ps
-        ;                                               (filter #(are-adjacent? p %))
-        ;                                               (into #{})) p)
-        ;                            rest    (remove cluster ps)]
-        ;                        (recur rest (conj res cluster))
-        ;                        ))
-        ;                    )
-        ;bla (println clustered-pockets)
-        ]
-    ;4261
-    (println (count cubes))
-    (println (type cubes))
-    (println (count air-pockets))
-    (println (type air-pockets))
-    ;(-
-    ;  (part1 cubes)
-    ;  (->> clustered-pockets
-    ;       (map part1)
-    ;       (reduce +)))
-
-    ))
+;(defn is-inside-neighbor?
+;  [cubes [nx ny nz]]
+;  (let [[min-x max-x] (let [xs (->> cubes
+;                                    (filter (fn [[x y z]] (= [y z] [ny nz])))
+;                                    (map first)
+;                                    sort)]
+;                        [(or (first xs) 1) (or (last xs) -1)])
+;        [min-y max-y] (let [ys (->> cubes
+;                                    (filter (fn [[x y z]] (= [x z] [nx nz])))
+;                                    (map second)
+;                                    sort)]
+;                        [(or (first ys) 1) (or (last ys) -1)])
+;        [min-z max-z] (let [zs (->> cubes
+;                                    (filter (fn [[x y z]] (= [x y] [nx ny])))
+;                                    (map last)
+;                                    sort)]
+;                        [(or (first zs) 1) (or (last zs)) -1])]
+;    (and
+;      (<= min-x nx max-x)
+;      (<= min-y ny max-y)
+;      (<= min-z nz max-z))))
+;
+;(comment
+;  (time
+;    (let [input       real-cubes
+;          all-cubes   (part1 input)
+;          air-pockets (->> input
+;                           (map neighbors)
+;                           (map #(into #{} %))
+;                           (reduce union)
+;                           (filter #(is-inside-neighbor? input %))
+;                           (map (fn [c] [c (neighbors c)]))
+;                           (filter (fn [[c n]]
+;                                     (and
+;                                       (not (.contains input c))
+;                                       (->> n
+;                                            (filter #(.contains input %))
+;                                            count
+;                                            (#(>= % 5))))))
+;                           (map first)
+;                           )
+;          ]
+;      (- all-cubes (part1 air-pockets))
+;      )))
+;
+;; can I determine enclosing cube?
+;; yes I can. What does that help me?
+;
+;; let's construct a real dumb example
+;(def dumb-cubes (remove #{[1 1 1]} (for [x (range 0 3)
+;                                         y (range 0 3)
+;                                         z (range 0 3)]
+;                                     [x y z])))
+;
+;(def dumb-cubes2 (remove #{[2 0 1] [2 1 1] [1 1 1]} (for [x (range 0 4)
+;                                                          y (range 0 3)
+;                                                          z (range 0 3)]
+;                                                      [x y z])))
+;
+;; this approach is somewhat flawed and too slow
+;;(def is-connected-to-outside?
+;;  (memoize
+;;    (fn
+;;      [graph from perimeter]
+;;      (loop [[node & nodes] [from]
+;;             visited #{}]
+;;        (cond
+;;          (nil? node) false
+;;          (.contains visited node) (recur nodes visited)
+;;          (.contains perimeter node) true
+;;          :default (recur (into nodes (get graph node)) (conj visited node)))))))
+;
+;; can I do a search/expand instead?
+;; I start with a node
+;; generate it's neighbors
+;; filter out the ones that are part of the input set
+;; check if its outside
+;; if yes, return true
+;; if not, recur with neighbors
+;
+;(defn is-inside-droplet?
+;  [cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z]]
+;  ;(println [x y z])
+;  (if (and
+;        (get-in cubes-by-x-y [x y])
+;        (get-in cubes-by-x-z [x z])
+;        (get-in cubes-by-y-z [y z]))
+;    (let [xs (->> (get-in cubes-by-y-z [y z])
+;                  (map first)
+;                  sort)
+;          ys (->> (get-in cubes-by-x-z [x z])
+;                  (map second)
+;                  sort)
+;          zs (->> (get-in cubes-by-x-y [x y])
+;                  (map #(get % 2))
+;                  sort)]
+;      ;(println xs ys zs)
+;      (and
+;        (<= (first xs) x (last xs)) ; is in the inner cube
+;        (<= (first ys) y (last ys))
+;        (<= (first zs) z (last zs))))
+;    false))
+;
+;(defn is-connected-to-outside?
+;  [cubes-by-x-y cubes-by-x-z cubes-by-y-z cubes node]
+;  ;(println node)
+;  (loop [[n & ns] [node]
+;         visited #{}]
+;    (cond
+;      (nil? n) false
+;      (.contains visited n) (recur ns visited)
+;      (not (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z n)) true
+;      :default (recur (into ns (->> (neighbors n)
+;                                    (filter #(not (.contains cubes %))))) (conj visited n)))))
+;
+;(defn is-connected-to-outside?2
+;  [min-x max-x min-y max-y min-z max-z cubes node]
+;  ;(println node)
+;  (loop [[n & ns] [node]
+;         visited #{}]
+;    ;(println n)
+;    ;(Thread/sleep 100)
+;    (let [[x y z] n]
+;      (cond
+;        (nil? n) false
+;        (.contains visited n) (recur ns visited)
+;        (or (< x min-x) (> x max-x)
+;            (< y min-y) (> y max-y)
+;            (< z min-z) (> z max-z)) true
+;        :default (recur (into ns (->> (neighbors n)
+;                                      (filter #(not (.contains cubes %))))) (conj visited n))))))
+;
+;; I'm not sure where my problem lies here, but let's ditch this approach for now
+;; wait a second...
+;(comment
+;  (let [cubes        (into #{} real-cubes)
+;        [min-x max-x] (let [xs (->> cubes
+;                                    (map first)
+;                                    sort)]
+;                        [(first xs) (last xs)])
+;        [min-y max-y] (let [ys (->> cubes
+;                                    (map second)
+;                                    sort)]
+;                        [(first ys) (last ys)])
+;        [min-z max-z] (let [zs (->> cubes
+;                                    (map #(get % 2))
+;                                    sort)]
+;                        [(first zs) (last zs)])
+;        cubes-by-x-y (->> cubes
+;                          (group-by first)
+;                          (map (fn [[x cubes]] [x (group-by second cubes)]))
+;                          (into {}))
+;        cubes-by-x-z (->> cubes
+;                          (group-by first)
+;                          (map (fn [[x cubes]] [x (group-by #(get % 2) cubes)]))
+;                          (into {}))
+;        cubes-by-y-z (->> cubes
+;                          (group-by second)
+;                          (map (fn [[x cubes]] [x (group-by #(get % 2) cubes)]))
+;                          (into {}))
+;        air-pockets  (->> (for [x (range min-x (inc max-x))
+;                                y (range min-y (inc max-y))
+;                                z (range min-z (inc max-z))
+;                                ;:when (and
+;                                ;        (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z])
+;                                ;        (not (.contains cubes [x y z])))
+;                                :when (is-inside-droplet? cubes-by-x-y cubes-by-x-z cubes-by-y-z [x y z])
+;                                ]
+;                            [x y z]))
+;        ;pockets               (->> air-pockets
+;        ;                           (filter (fn [[cube category]] (= category :pocket)))
+;        ;                           (map first)
+;        ;                           )
+;        ;perimeter             (->> air-pockets
+;        ;                           (filter (fn [[cube category]] (= category :perimeter)))
+;        ;                           (map first)
+;        ;                           )
+;        ;pockets-and-perimeter (concat pockets perimeter)
+;        ;pp-graph              (reduce (fn [m cube] (assoc m cube (filter #(are-adjacent? cube %) pockets-and-perimeter))) {} pockets-and-perimeter)
+;        ;actual-pockets    (filter #(not (is-connected-to-outside?2 min-x max-x min-y max-y min-z max-z cubes %)) air-pockets)
+;        ;actual-pockets    (filter #(is-connected-to-outside?2 min-x max-x min-y max-y min-z max-z cubes %) air-pockets)
+;        ;bla               (println (count air-pockets))
+;        ;bla               (println (count actual-pockets))
+;        ;clustered-pockets (loop [[p & ps] actual-pockets
+;        ;                         res []]
+;        ;                    (if (nil? p)
+;        ;                      res
+;        ;                      (let [cluster (conj (->> ps
+;        ;                                               (filter #(are-adjacent? p %))
+;        ;                                               (into #{})) p)
+;        ;                            rest    (remove cluster ps)]
+;        ;                        (recur rest (conj res cluster))
+;        ;                        ))
+;        ;                    )
+;        ;bla (println clustered-pockets)
+;        ]
+;    ;4261
+;    (println (count cubes))
+;    (println (type cubes))
+;    (println (count air-pockets))
+;    (println (type air-pockets))
+;    ;(-
+;    ;  (part1 cubes)
+;    ;  (->> clustered-pockets
+;    ;       (map part1)
+;    ;       (reduce +)))
+;
+;    ))
 
 ;... and try the fred overflow approach
 ; border flood fill
