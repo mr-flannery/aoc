@@ -1,8 +1,9 @@
 (ns day16.solution2
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.pprint :refer [pprint]])
-  (:import (java.util HashSet)))
+            [clojure.pprint :refer [pprint]]
+            [clojure.data.priority-map :refer [priority-map]])
+  (:import (java.util HashSet HashMap)))
 
 (def input (slurp (io/resource "day16/input.txt")))
 
@@ -17,52 +18,210 @@
 (def sample-graph (parse sample-input))
 (def graph (parse input))
 
-(defn dfs-cost
-  [graph from to]
-  (loop [[[valve cost] & others] [[from 0]]
-         visited #{from}]
-    (if (nil? valve)
-      ##Inf
-      (if (= valve to)
-        cost
-        (let [neighbors (->> (:n (get graph valve))
-                             (filter #(not (.contains visited %)))
-                             (map (fn [n] [n (inc cost)])))]
-          (recur (concat neighbors others) (conj visited valve)))))))
+(defn init-p-queue
+  [graph from]
+  (assoc
+    (apply priority-map (interleave (keys graph) (repeat (count graph) ##Inf)))
+    from
+    0))
 
-; wtf? this should be 3 but returns 5
-(dfs-cost sample-graph "BB" "JJ")
+(def cost-of-shortest-path
+  (memoize (fn
+             [graph from to]
+             (loop [p-queue (init-p-queue graph from)
+                    visited []]
+               (let [[p cost] (first p-queue)]
+                 (if (= p to)
+                   cost
+                   (let [neighbors       (->> (:n (get graph p))
+                                              (filter #(not (.contains visited %))))
+                         updated-p-queue (reduce (fn [p-q n]
+                                                   (let [n-cost (get p-q n)]
+                                                     (if (< cost n-cost)
+                                                       (assoc p-q n (inc cost))
+                                                       p-q))) p-queue neighbors)]
+                     (recur (dissoc updated-p-queue p) (conj visited p)))))))))
 
-; is there a greedy bug in here?
 
-; let's try brute forcing this bitch
-(->> (let [max-round 30 
-           start     "AA"
-           graph     sample-graph
-           results   (HashSet.)]
-       (loop [[[round opened total-flow current calcs] & states] [[0 [] 0 start []]]]
-         (if (nil? round)
-           results
-           (let [options     (->> graph
-                                  (filter (fn [[v {:keys [f n]}]]
-                                            (and
-                                              (not (.contains opened v))
-                                              (> f 0)
-                                              (<= (inc (dfs-cost graph current v)) (- max-round round))))))
-                 next-states (map (fn [[v {:keys [f n]}]]
-                                    [(+ round (inc (dfs-cost graph current v)))
-                                     (conj opened v)
-                                     (+ total-flow (* f (- max-round round (inc (dfs-cost graph current v)))))
-                                     v
-                                     (conj calcs [f (- max-round round (inc (dfs-cost graph current v)))])])
-                                  options)]
-             (if (empty? next-states)
-               (do
-                 (.add results [round opened total-flow current calcs])
-                 (recur states))
-               (recur (into states next-states)))))))
-     (sort-by (fn [[round opened total-flow current]] total-flow))
-     ; I'm expecting 28*20 + 13*25 + 21*21 + 13*22 + 9*3 + 6*2
-     ; but I'm getting [[20 28] [13 25] [21 19] [22 11] [3 7] [2 4]]
-     (filter (fn [[round opened total-flow current]] (= opened ["DD" "BB" "JJ" "HH" "EE" "CC"])))
-     )
+; let's try brute forcing this
+; okay I might need somehing like a p-queue here...
+(defn state-p-queue
+  [state]
+  (priority-map state 0))
+
+(defn next-options
+  [graph opened current max-round round]
+  (->> graph
+       (filter (fn [[v {:keys [f n]}]]
+                 (and
+                   (not (.contains opened v))
+                   (> f 0)
+                   (<= (inc (cost-of-shortest-path graph current v)) (- max-round round)))))
+       (sort-by (fn [[v {:keys [f n]}]] f) >)))
+
+;part 1
+(comment
+  (time
+    (->> (let [max-round 30
+               start     "AA"
+               graph     graph
+               results   (HashSet.)]
+           (loop [p-queue (state-p-queue [0 [] 0 start []])]
+             (let [[[round opened total-flow current calcs]] (first p-queue)]
+               (if (nil? round)
+                 results
+                 (let [options      (next-options graph opened current max-round round)
+                       next-states  (map (fn [[v {:keys [f n]}]]
+                                           [(+ round (inc (cost-of-shortest-path graph current v)))
+                                            (conj opened v)
+                                            (+ total-flow (* f (- max-round round (inc (cost-of-shortest-path graph current v)))))
+                                            v
+                                            (conj calcs [f (- max-round round (inc (cost-of-shortest-path graph current v)))])])
+                                         options)
+
+                       next-p-queue (dissoc
+                                      (reduce
+                                        (fn [p-q [round opened total-flow current calcs]]
+                                          (assoc p-q [round opened total-flow current calcs] total-flow))
+                                        p-queue next-states)
+                                      [round opened total-flow current calcs])
+                       ]
+
+                   (if (empty? next-states)
+                     (do
+                       (.add results [round opened total-flow current calcs])
+                       (recur next-p-queue))
+                     (recur next-p-queue)))))))
+         (sort-by (fn [[round opened total-flow current]] total-flow))
+         last
+         ;(filter (fn [[round opened total-flow current]] (= opened ["DD" "BB" "JJ" "HH" "EE" "CC"])))
+         )))
+
+; ===
+; TODO: think hard whether part2 can somehow be solved in terms of part1
+; this is getting haaard....
+(comment
+  (time
+    (->> (let [max-round                     26
+               start                         "AA"
+               graph                         graph
+               max-flow-rate               (->> graph (map (fn [[k v]] (:f v))) (reduce +))
+               results                       (HashSet.)
+               min-round-at-max-flow-rate (atom (inc max-round))]
+           (println max-flow-rate)
+           (loop [[[round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate total-flow] & states] [[0 start 0 nil start 0 nil #{} [] 0 0]]]
+             ;(if (> (count results) 0) (println (count p-queue)))
+             ;(println (count states))
+             (if (nil? round)
+               results
+               (if (= round max-round)
+                 (do
+                   (.add results [round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate total-flow])
+                   (recur states))
+                 (let [[round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate total-flow] (let [new-flow-1 (if (= round next-turn1)
+                                                                                                                                                      (if (nil? next-valve1)
+                                                                                                                                                        0
+                                                                                                                                                        (:f (get graph next-valve1)))
+                                                                                                                                                      0)
+                                                                                                                                         new-flow-2 (if (= round next-turn2)
+                                                                                                                                                      (if (nil? next-valve2)
+                                                                                                                                                        0
+                                                                                                                                                        (:f (get graph next-valve2)))
+                                                                                                                                                      0)
+                                                                                                                                         flow-rate  (+ flow-rate new-flow-1 new-flow-2)]
+                                                                                                                                     [round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate (+ total-flow flow-rate)])
+                       new-states (cond
+                                    ; TODO: there might be an edge case lurking here where I need to choose two but only have one more option
+                                    (= round next-turn1 next-turn2) (let [
+                                                                          options1     (next-options graph opened pos1 max-round round)
+                                                                          options2     (for [option1 options1]
+                                                                                         (next-options graph (conj opened (first option1)) pos2 max-round round))
+                                                                          option-pairs (mapcat #(zip (repeat (count options1) (nth options1 %)) (nth options2 %)) (range 0 (count options1)))
+                                                                          new-states   (->> option-pairs
+                                                                                            (map (fn choose-both [[[v1 {f1 :f n1 :n}] [v2 {f2 :f n2 :n}]]]
+                                                                                                   [(inc round)
+                                                                                                    v1 ; when do I update the current position? pos1
+                                                                                                    (+ next-turn1 (inc (cost-of-shortest-path graph pos1 v1)))
+                                                                                                    v1
+                                                                                                    v2 ; when do I update the current position? pos2
+                                                                                                    (+ next-turn2 (inc (cost-of-shortest-path graph pos2 v2)))
+                                                                                                    v2
+                                                                                                    (into opened [v1 v2])
+                                                                                                    (into opened-in-order [[v1 (+ next-turn1 (inc (cost-of-shortest-path graph pos1 v1)))] [v2 (+ next-turn2 (inc (cost-of-shortest-path graph pos2 v2)))]])
+                                                                                                    flow-rate
+                                                                                                    total-flow
+                                                                                                    ]
+                                                                                                   )))
+                                                                          ;bla          (if (or (empty? options1) (empty? options2))
+                                                                          ;               (do
+                                                                          ;                 (println "ONE OF THEM IS EMPTY!" (empty? options2))
+                                                                          ;                 (println [round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened flow-rate total-flow])))
+                                                                          ]
+                                                                      new-states
+                                                                      )
+                                    (= round next-turn1) (let [
+                                                               options1 (next-options graph opened pos1 max-round round)]
+                                                           (->> options1
+                                                                (map (fn choose1 [[v1 {f1 :f n1 :n}]]
+                                                                       [(inc round)
+                                                                        v1 ; when do I update the current position? pos1
+                                                                        (+ next-turn1 (inc (cost-of-shortest-path graph pos1 v1)))
+                                                                        v1
+                                                                        pos2 ; when do I update the current position? pos2
+                                                                        next-turn2
+                                                                        next-valve2
+                                                                        (into opened [v1])
+                                                                        (into opened-in-order [[v1 (+ next-turn1 (inc (cost-of-shortest-path graph pos1 v1)))]])
+                                                                        flow-rate
+                                                                        total-flow
+                                                                        ]))))
+                                    (= round next-turn2) (let [
+                                                               options2 (next-options graph opened pos2 max-round round)]
+                                                           (->> options2
+                                                                (map (fn choose2 [[v2 {f2 :f n2 :n}]]
+                                                                       [(inc round)
+                                                                        pos1 ; when do I update the current position? pos1
+                                                                        next-turn1
+                                                                        next-valve1
+                                                                        v2 ; when do I update the current position? pos2
+                                                                        (+ next-turn2 (inc (cost-of-shortest-path graph pos2 v2)))
+                                                                        v2
+                                                                        (into opened [v2])
+                                                                        (into opened-in-order [[v2 (+ next-turn2 (inc (cost-of-shortest-path graph pos2 v2)))]])
+                                                                        flow-rate
+                                                                        total-flow
+                                                                        ]))))
+                                    (= flow-rate max-flow-rate) (do
+                                                                  ;(println flow-rate)
+                                                                  [[max-round pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate (+ total-flow (* flow-rate (- (dec max-round) round)))]])
+                                    :default (do [[(inc round) pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate total-flow]]))
+                       new-states (if (empty? new-states)
+                                    [[(inc round) pos1 next-turn1 next-valve1 pos2 next-turn2 next-valve2 opened opened-in-order flow-rate total-flow]]
+                                    new-states)
+                       ]
+
+                   (recur (into new-states states)))
+                 
+                 ))))
+         (sort-by last <)
+         last
+         ;sort 
+         )))
+
+(next-options sample-graph #{"AA" "BB" "CC" "DD" "EE" "FF" "GG" "HH"} "AA" 10 30)
+
+(defn zip
+  [& cols]
+  (partition (count cols) (apply interleave cols)))
+
+(let [vec1 [2 3 4 5 1]
+      vec2 (repeat 5 [1 2 3 4 5])]
+  (map #(zip (repeat 5 (nth vec1 %)) (nth vec2 %)) (range 0 5))
+  )
+(let [max-flow-at-round (HashMap.)]
+  (< (or (get max-flow-at-round 0) 0) 0)
+  )
+
+(let [[[word] & ba] (into (state-p-queue "ass") [["bobs" -10]])]
+  (println word)
+  (println ba))
