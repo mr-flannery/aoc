@@ -139,34 +139,52 @@
        (sort-by :geode <)
        last))
 
+(defn can-afford?
+  [blueprint state robot]
+  (condp = robot
+    :geode-robot (and (>= (state :ore) (blueprint :g-o)) (>= (state :obsidian) (blueprint :g-ob)))
+    :obsidian-robot (and (>= (state :ore) (blueprint :ob-o)) (>= (state :clay) (blueprint :ob-c)))
+    :clay-robot (>= (state :ore) (blueprint :c-o))
+    :ore-robot (>= (state :ore) (blueprint :o-o))))
+
+(defn could-have-bought-last-turn?
+  [blueprint state robot builds]
+  (if (= :none (last builds))
+    (let [prev-state (merge state {:ore      (- (state :ore) (state :ore-robots))
+                                   :clay     (- (state :clay) (state :clay-robots))
+                                   :obsidian (- (state :obsidian) (state :obsidian-robots))
+                                   })]
+      (can-afford? blueprint prev-state robot))
+    false))
+
 (defn options-m
-  [blueprint state max-robots]
+  [blueprint state max-robots builds]
   (let [opts (ArrayList.)]
-    (if (and (>= (state :ore) (blueprint :g-o)) (>= (state :obsidian) (blueprint :g-ob)))
+    (if (can-afford? blueprint state :geode-robot)
       (.add opts :geode-robot)
       (do
         (if (and
-              (>= (state :ore) (blueprint :ob-o))
-              (>= (state :clay) (blueprint :ob-c))
+              (can-afford? blueprint state :obsidian-robot)
+              (not (could-have-bought-last-turn? blueprint state :obsidian-robot builds))
               (< (state :obsidian-robots) (max-robots :obsidian-robots)))
           (.add opts :obsidian-robot))
         (if (and
-              (>= (state :ore) (blueprint :c-o))
+              (can-afford? blueprint state :clay-robot)
+              (not (could-have-bought-last-turn? blueprint state :clay-robot builds))
               (< (state :clay-robots) (max-robots :clay-robots)))
           (.add opts :clay-robot))
         (if (and
-              (>= (state :ore) (blueprint :o-o))
+              (can-afford? blueprint state :ore-robot)
+              (not (could-have-bought-last-turn? blueprint state :ore-robot builds))
               (< (state :ore-robots) (max-robots :ore-robots)))
           (.add opts :ore-robot))
         (.add opts :none)))
     opts))
 
 (defn next-states-m
-  [blueprint state turn prev-states max-robots]
-  (let [og-state state]
-    (->> (options-m blueprint state max-robots)
-         (map #(build-robot blueprint (collect-resources state) %))
-         (map (fn [state] [state (inc turn) (conj prev-states og-state)])))))
+  [blueprint state turn builds max-robots]
+  (->> (options-m blueprint state max-robots builds)
+       (map (fn [b] [(build-robot blueprint (collect-resources state) b) (inc turn) (conj builds b)]))))
 
 (defn update-max-geode-robots
   [max-geode-robots-per-turn turn robots]
@@ -178,25 +196,28 @@
 
 ; let's try copying Marika's approach
 (defn part1-m
-  [blueprint]
-  (->> (let [turns                     24
+  [blueprint turns]
+  (->> (let [
              max-robots                {:ore-robots      (apply max (vals (select-keys blueprint [:o-o :c-o :ob-o :g-o])))
                                         :clay-robots     (blueprint :ob-c)
                                         :obsidian-robots (blueprint :g-ob)
                                         :geode-robots    Integer/MAX_VALUE}
              max-geode-robots-per-turn (atom (zipmap (range 0 (inc turns)) (repeat (inc turns) 0)))
              result                    (atom #{})]
-         (loop [[[state turn prev-states] & states] [[initial-state 0 []]]]
+         (println "let's go")
+         (loop [[[state turn prev-states] & states] [[initial-state 0]]]
            ;(println [state turn])
            (if (and
                  (some? state)
                  (>= (state :geode-robots) 1)
                  (> (state :geode-robots) (get @max-geode-robots-per-turn turn)))
              (do
-               (println turn)
+               (println [state turn])
                (swap! max-geode-robots-per-turn update-max-geode-robots turn (state :geode-robots))
-               (println @max-geode-robots-per-turn)
-               (reset! result #{})))
+               (println (sort-by first @max-geode-robots-per-turn))
+               ;(reset! result #{})
+               )
+             )
            (if (= turn turns) ; state is played out
              (do
                (swap! result #(conj % [state turn prev-states])) ; add the state to the result set
@@ -206,18 +227,78 @@
                (if (> (get @max-geode-robots-per-turn turn) (:geode-robots state))
                  (recur states)
                  (recur (into (next-states-m blueprint state turn prev-states max-robots) states)))))))
-       first 
-       first 
-       :geode
+       ;first
+       ;first
+       ;:geode
+       ;(map first)
+       ;(sort-by :geode <)
+       ;last
        ))
 
+;part1
 (comment
   (time
     (->> real-blueprints
-         (map (fn [bp] (* (bp :id) (part1-m bp))))
-         ;(map (fn [[id {g :geode}]] (* g id)))
-         ;(reduce +)
+         (map (fn [bp] (* (bp :id) (part1-m bp 24))))
+         (reduce +)
          ))) ; if not build new states from the current one
+
+(defn part2-m
+  [blueprint turns]
+  (->> (let [
+             max-robots                {:ore-robots      (apply max (vals (select-keys blueprint [:o-o :c-o :ob-o :g-o])))
+                                        :clay-robots     (blueprint :ob-c)
+                                        :obsidian-robots (blueprint :g-ob)
+                                        :geode-robots    Integer/MAX_VALUE}
+             max-geode-robots-per-turn (atom (zipmap (range 0 (inc turns)) (repeat (inc turns) 0)))
+             max-geodes                (atom 0)
+             result                    (atom #{})]
+         (println "let's go")
+         (loop [[[state turn builds] & states] [[initial-state 0 []]]]
+           ;(println [state turn])
+           ;(println builds)
+           (if (= turn turns) ; state is played out
+             (do
+               (if (> (state :geode) @max-geodes)
+                 (do
+                   (println (state :geode))
+                   (swap! result #(conj % [state turn builds])) ; add the state to the result set
+                   (reset! max-geodes (state :geode))))
+               (recur states))
+             (if (nil? state) ; we considered all relevant states
+               @result ; or we're just done
+               (let [time-left            (- turns turn)
+                     potential-max-geodes (+ (state :geode) (* (state :geode-robots) time-left) (/ (* time-left (dec time-left)) 2))]
+                 (if (<= potential-max-geodes @max-geodes)
+                   (recur states)
+                   (if (and (>= (state :ore-robots) (blueprint :g-o)) (>= (state :obsidian-robots) (blueprint :g-ob)))
+                     (do
+                       (println (state :geode) @max-geodes)
+                       (println state)
+                       (reset! max-geodes (max @max-geodes potential-max-geodes))
+                       (recur states))
+                     (recur (into (next-states-m blueprint state turn builds max-robots) states)))))))))
+       ;first
+       ;first
+       ;:geode
+       (map first)
+       (sort-by :geode <)
+       last
+       ))
+
+;part2
+(comment
+  (time
+    (->>
+      ;(take 2 sample-blueprints)
+      (take 3 real-blueprints)
+      (map #(part2-m % 32))
+      (map :geode)
+      ;(map (fn [[id {g :geode}]] (* g id)))
+      (reduce *)
+      )))
+
+
 
 (defn nats-from-n
   [n]
