@@ -19,6 +19,7 @@
               {:id id :o-o ore-ore :c-o clay-ore :ob-o obsidian-ore :ob-c obsidian-clay :g-o geode-ore :g-ob geode-obsidian}))))
 
 (def sample-blueprints (parse sample-input))
+(def real-blueprints (parse input))
 
 (defn options
   [blueprint state]
@@ -61,6 +62,7 @@
          (map #(build-robot blueprint (collect-resources state) %))
          (map (fn [state] [state (inc turn) (conj prev-states og-state)])))))
 
+; this is naive and way too costly
 (comment
   (time
     (let [blueprint                 (first sample-blueprints)
@@ -88,6 +90,7 @@
 ; can I somehow modify my search so that I prioritize states that arrive early at the next higher robot?
 ; okay, so like this I get the quickest way to 1 clay robot
 (def target-seq (concat [[:clay-robots 1] [:obsidian-robots 1]] (iterate (fn [[robot count]] [robot (inc count)]) [:geode-robots 1])))
+(def target-seq (concat [[:clay-robots 1] [:obsidian-robots 1]]))
 
 (defn update-next-starting-states
   [next-starting-states state]
@@ -98,47 +101,123 @@
       (> current-min-turn turn) [state]
       :default (conj next-starting-states state))))
 
+; this assumes that there are clear intermediate goals
+; which seems to be wrong 
+(defn part1
+  [blueprint]
+  (->> (let [turns              24
+             target-seq-counter (atom 0)
+             next-target        (fn []
+                                  (let [res (nth target-seq @target-seq-counter)]
+                                    (swap! target-seq-counter inc)
+                                    res))
+             result             (atom #{})]
+         (loop [[[state turn prev-states] & states] [[initial-state 0 []]]
+                next-starting-states []
+                [target-robot target-number] (next-target)]
+           ;(println [state turn] next-starting-states)
+           (if (= turn turns) ; state is played out
+             (do
+               (swap! result #(conj % [state turn prev-states])) ; add the state to the result set
+               (recur states next-starting-states [target-robot target-number]))
+             (if (nil? state) ; we considered all relevant states
+               (if (seq next-starting-states) ; we reached the next relevant target and have a new jumping-off point
+                 (do
+                   (pprint (map first next-starting-states))
+                   (reset! result #{}) ; we clear the result set so that we only keep the states from the last jumping-off point in the end
+                   ;(println "recur!")
+                   (recur next-starting-states [] (next-target)))
+                 @result) ; or we're just done
+               (if (= target-number (target-robot state)) ; we fulfill the condition for reaching the next target
+                 (if (seq next-starting-states)
+                   (recur states (update-next-starting-states next-starting-states [state turn prev-states]) [target-robot target-number]) ; if we have a candidate already and it took less turn to get there, keep the current one
+                   (recur states (conj next-starting-states [state turn prev-states]) [target-robot target-number]))
+                 (if (>= turn (or (-> next-starting-states first second) 24)) ; check if we've exceeded the best current candidate already
+                   (recur states next-starting-states [target-robot target-number])
+                   (recur (into (next-states blueprint state turn prev-states) states) next-starting-states [target-robot target-number])))))))
+       (map first)
+       (sort-by :geode <)
+       last))
 
-; guess I found my problem, and this is interesting:
-; for the first sample blueprints, there are multiple states that lead to the same target state in the same time
-; however, this creates Folgefehler when jumping-off, since exactly one resource may be missing in order to build something in time
-; naive approach is to keep all candidates around
-; if this doesn't work out I may need to introduce some other predicate that biases towards more expensive resources, but that's kinda guessing again
+(defn options-m
+  [blueprint state max-robots]
+  (let [opts (ArrayList.)]
+    (if (and (>= (state :ore) (blueprint :g-o)) (>= (state :obsidian) (blueprint :g-ob)))
+      (.add opts :geode-robot)
+      (do
+        (if (and
+              (>= (state :ore) (blueprint :ob-o))
+              (>= (state :clay) (blueprint :ob-c))
+              (< (state :obsidian-robots) (max-robots :obsidian-robots)))
+          (.add opts :obsidian-robot))
+        (if (and
+              (>= (state :ore) (blueprint :c-o))
+              (< (state :clay-robots) (max-robots :clay-robots)))
+          (.add opts :clay-robot))
+        (if (and
+              (>= (state :ore) (blueprint :o-o))
+              (< (state :ore-robots) (max-robots :ore-robots)))
+          (.add opts :ore-robot))
+        (.add opts :none)))
+    opts))
+
+(defn next-states-m
+  [blueprint state turn prev-states max-robots]
+  (let [og-state state]
+    (->> (options-m blueprint state max-robots)
+         (map #(build-robot blueprint (collect-resources state) %))
+         (map (fn [state] [state (inc turn) (conj prev-states og-state)])))))
+
+(defn update-max-geode-robots
+  [max-geode-robots-per-turn turn robots]
+  (->> max-geode-robots-per-turn
+       (map (fn [[t r]] (if (>= t turn)
+                          [t (max r robots)]
+                          [t r])))
+       (into {})))
+
+; let's try copying Marika's approach
+(defn part1-m
+  [blueprint]
+  (->> (let [turns                     24
+             max-robots                {:ore-robots      (apply max (vals (select-keys blueprint [:o-o :c-o :ob-o :g-o])))
+                                        :clay-robots     (blueprint :ob-c)
+                                        :obsidian-robots (blueprint :g-ob)
+                                        :geode-robots    Integer/MAX_VALUE}
+             max-geode-robots-per-turn (atom (zipmap (range 0 (inc turns)) (repeat (inc turns) 0)))
+             result                    (atom #{})]
+         (loop [[[state turn prev-states] & states] [[initial-state 0 []]]]
+           ;(println [state turn])
+           (if (and
+                 (some? state)
+                 (>= (state :geode-robots) 1)
+                 (> (state :geode-robots) (get @max-geode-robots-per-turn turn)))
+             (do
+               (println turn)
+               (swap! max-geode-robots-per-turn update-max-geode-robots turn (state :geode-robots))
+               (println @max-geode-robots-per-turn)
+               (reset! result #{})))
+           (if (= turn turns) ; state is played out
+             (do
+               (swap! result #(conj % [state turn prev-states])) ; add the state to the result set
+               (recur states))
+             (if (nil? state) ; we considered all relevant states
+               @result ; or we're just done
+               (if (> (get @max-geode-robots-per-turn turn) (:geode-robots state))
+                 (recur states)
+                 (recur (into (next-states-m blueprint state turn prev-states max-robots) states)))))))
+       first 
+       first 
+       :geode
+       ))
+
 (comment
   (time
-    (->> (let [blueprint          (second sample-blueprints)
-               turns              24
-               target-seq-counter (atom 0)
-               next-target        (fn []
-                                    (let [res (nth target-seq @target-seq-counter)]
-                                      (swap! target-seq-counter inc)
-                                      res))
-               result             (atom #{})]
-           (loop [[[state turn prev-states] & states] [[initial-state 0 []]]
-                  next-starting-states []
-                  [target-robot target-number] (next-target)]
-             ;(println [state turn] next-starting-states)
-             (if (= turn turns) ; state is played out
-               (do
-                 (swap! result #(conj % [state turn prev-states])) ; add the state to the result set
-                 (recur states next-starting-states [target-robot target-number]))
-               (if (nil? state) ; we considered all relevant states
-                 (if (seq next-starting-states) ; we reached the next relevant target and have a new jumping-off point
-                   (do
-                     ;(pprint next-starting-states)
-                     (reset! result #{}) ; we clear the result set so that we only keep the states from the last jumping-off point in the end
-                     ;(println "recur!")
-                     (recur next-starting-states [] (next-target)))
-                   @result) ; or we're just done
-                 (if (= target-number (target-robot state)) ; we fulfill the condition for reaching the next target
-                   (if (seq next-starting-states)
-                     (recur states (update-next-starting-states next-starting-states [state turn prev-states]) [target-robot target-number]) ; if we have a candidate already and it took less turn to get there, keep the current one
-                     (recur states (conj next-starting-states [state turn prev-states]) [target-robot target-number]))
-                   (if (>= turn (or (-> next-starting-states first second) 24)) ; check if we've exceeded the best current candidate already
-                     (recur states next-starting-states [target-robot target-number])
-                     (recur (into (next-states blueprint state turn prev-states) states) next-starting-states [target-robot target-number])))))))
-         (map #(take 2 %))
-         (sort-by (comp :geode first) <)))) ; if not build new states from the current one
+    (->> real-blueprints
+         (map (fn [bp] (* (bp :id) (part1-m bp))))
+         ;(map (fn [[id {g :geode}]] (* g id)))
+         ;(reduce +)
+         ))) ; if not build new states from the current one
 
 (defn nats-from-n
   [n]
