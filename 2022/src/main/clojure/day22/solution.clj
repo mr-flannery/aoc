@@ -138,37 +138,18 @@
        first
        first))
 
-; I will probably need to write unit tests for this
 (defn step2
   [[l c] direction field max-l max-c]
-  ;(println "called with " [l c] direction)
   (let [side    (pos->side [l c])
         [n-l n-c] (next-pos [l c] direction max-l max-c)
         field-v (get field [n-l n-c])]
-    ;(println "next-pos: " [n-l n-c] field-v)
     (condp = field-v
-      :void (let [
-                  ;bla (println [[l c] direction])
-                  [next-side next-dir] (get-in cube-turns [side direction])
-                  ;bla (println [next-side next-dir])
+      :void (let [[next-side next-dir] (get-in cube-turns [side direction])
                   [new-l new-c] ((get cube-turn-fns [direction next-dir]) [(mod l 50) (mod c 50)])
-                  ;bla (println [new-l new-c])
-                  ;TODO: naming
-                  next-field-v (get field (v+ (side->offset next-side) [new-l new-c]))
-                  ;[[new-new-l new-new-c] new-dir] (step2 (v+ (side->offset next-side) [new-l new-c]) next-dir field max-l max-c)
-                  ]
-              ;(println "offset: " (side->offset next-side))
-              ;(println "new: " [new-l new-c])
-              ;(println "result: " (v+ (side->offset next-side) [new-l new-c]))
-              ;(println "next-field-v: " next-field-v)
+                  next-field-v (get field (v+ (side->offset next-side) [new-l new-c]))]
               (if (= :wall next-field-v)
                 [[l c] direction]
-                [(v+ (side->offset next-side) [new-l new-c]) next-dir])
-              ;(println [[new-new-l new-new-c] new-dir] [[new-l new-c] next-dir])
-              ;(if (= [[new-new-l new-new-c] new-dir] [[new-l new-c] next-dir])
-              ;  [[l c] direction]
-              ;  [[new-new-l new-new-c] new-dir])
-              )
+                [(v+ (side->offset next-side) [new-l new-c]) next-dir]))
       :wall [[l c] direction]
       :free [[n-l n-c] direction])))
 
@@ -181,9 +162,6 @@
       [[l c] direction]
       (let [[[l c] direction] (step2 [l c] direction field max-l max-c)]
         (recur (dec steps) [l c] direction)))))
-
-(defn follow-instruction2
-  [[l c] direction])
 
 (comment
   (time
