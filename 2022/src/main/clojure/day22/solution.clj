@@ -196,7 +196,7 @@
              direction initial-direction
              [inst & insts] instructions]
         (if (nil? inst)
-          (+ (* 1000 l) (* 4 c) (direction->score direction))
+          (+ (* 1000 (inc l)) (* 4 (inc c)) (direction->score direction))
           (if (number? inst)
             (let [[[l c] direction] (move2 [l c] direction inst field max-l max-c)]
               (recur [l c] direction insts))
